@@ -5,7 +5,7 @@ RUN rm -f /usr/share/nginx/html/index.html
 
 # Copy website files to the default NGINX directory
 COPY 03-resources /usr/share/nginx/html
-COPY lib  /usr/share/nginx/html/lib
+COPY lib /usr/share/nginx/html/lib
 
 # Copy the custom NGINX configuration
 COPY default.conf /etc/nginx/conf.d/default.conf
