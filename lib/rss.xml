@@ -1,0 +1,772 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[CKA 1.31 Exam]]></title><description><![CDATA[Obsidian digital garden]]></description><link>https://cka.ipcheck.sh/</link><image><url>https://cka.ipcheck.sh/lib/media/favicon.png</url><title>CKA 1.31 Exam</title><link>https://cka.ipcheck.sh/</link></image><generator>Webpage HTML Export plugin for Obsidian</generator><lastBuildDate>Sun, 03 Nov 2024 16:36:16 GMT</lastBuildDate><atom:link href="https://cka.ipcheck.sh/lib/rss.xml" rel="self" type="application/rss+xml"/><pubDate>Sun, 03 Nov 2024 16:36:13 GMT</pubDate><copyright><![CDATA[Matthew Evans]]></copyright><ttl>60</ttl><dc:creator>Matthew Evans</dc:creator><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br><br>Role-based access control (RBAC) is a method of regulating access to computer or network resources based on the roles of individual users within your organization.<br>RBAC authorization uses the&nbsp;rbac.authorization.k8s.io&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups-and-versioning" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups-and-versioning" target="_blank">API group</a>&nbsp;to drive authorization decisions, allowing you to dynamically configure policies through the Kubernetes API.<br>To enable RBAC, start the&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/concepts/architecture/#kube-apiserver" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/concepts/architecture/#kube-apiserver" target="_blank">API server</a>&nbsp;with the&nbsp;--authorization-mode flag set to a comma-separated list that includes&nbsp;RBAC.<br>sudo kube-apiserver --authorization-mode=Example,RBAC --other-options --more-options
+Copy<br><br>
+<br>Role
+
+<br>A role contains rules that represent a set of permissions.
+
+
+<br>ClusterRole
+
+<br>A cluster role contains rules that represent a set of permissions.
+
+
+<br>RoleBinding
+
+<br>A role binding grants the permissions defined in a role to a user or set of users.
+
+
+<br>ClusterRoleBinding
+
+<br>A cluster role binding grants the permissions defined in a cluster role to a user or set of users.
+
+
+<br><br>An RBAC&nbsp;Role&nbsp;or&nbsp;ClusterRole&nbsp;contains rules that represent a set of permissions. Permissions are purely additive (there are no "deny" rules).<br>A Role&nbsp;holds rules that are specific to a namespace. It can only be used to grant access to resources within a particular namespace.<br>ClusterRole, by contrast, is a non-namespaced resource. The resources have different names (Role and ClusterRole) because a Kubernetes object always has to be either namespaced or not namespaced; it can't be both.<br>ClusterRoles have several uses. <br>You can use a ClusterRole to:<br>
+<br>define permissions on namespaced resources and be granted access within individual namespace(s)
+<br>define permissions on namespaced resources and be granted access across all namespaces
+<br>define permissions on cluster-scoped resources
+<br>Tldr
+If you want to define a role within a namespace, use a Role, if you want to define a role cluster-wide, use a ClusterRole.
+<br>Role Example:<br>apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""] # "" indicates the core API group
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+Copy<br>A ClusterRole&nbsp;holds rules that are applicable across the entire cluster. It can be used to grant access to resources in all namespaces.<br>A ClusterRole can be used to grant the same permissions as a Role. Because ClusterRoles are cluster-scoped, you can also use them to grant access to:<br>
+<br>cluster-scoped resources (like&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/concepts/architecture/nodes/" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/concepts/architecture/nodes/" target="_blank">nodes</a>)
+<br>non-resource endpoints (like&nbsp;/healthz)
+<br>namespaced resources (like Pods), across all namespaces<br>
+For example: you can use a ClusterRole to allow a particular user to run&nbsp;kubectl get pods --all-namespaces
+<br>ClusterRole Example:<br>apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # "namespace" omitted since ClusterRoles are not namespaced
+  name: secret-reader
+rules:
+- apiGroups: [""]
+  #
+  # at the HTTP level, the name of the resource for accessing Secret
+  # objects is "secrets"
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+Copy<br><br>A RoleBinding grants the permissions defined in a role to a user or set of users. It holds a list of subjects (users, groups, or service accounts), and a reference to the role being granted.<br>A RoleBinding grants permissions within a specific namespace whereas a ClusterRoleBinding grants that access cluster-wide.<br>A RoleBinding may reference any Role in the same namespace. Alternatively, a RoleBinding can reference a ClusterRole and bind that ClusterRole to the namespace of the RoleBinding. If you want to bind a ClusterRole to all the namespaces in your cluster, you use a ClusterRoleBinding.<br>RoleBinding Example:<br>Here is an example of a RoleBinding that grants the "pod-reader" Role to the user "jane" within the "default" namespace. This allows "jane" to read pods in the "default" namespace.<br>apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "jane" to read pods in the "default" namespace.
+# You need to already have a Role named "pod-reader" in that namespace.
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+# You can specify more than one "subject"
+- kind: User
+  name: jane # "name" is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  # "roleRef" specifies the binding to a Role / ClusterRole
+  kind: Role #this must be Role or ClusterRole
+  name: pod-reader # this must match the name of the Role or ClusterRole you wish to bind to
+  apiGroup: rbac.authorization.k8s.io
+Copy<br>A RoleBinding can also reference a ClusterRole to grant the permissions defined in that ClusterRole to resources inside the RoleBinding's namespace. This kind of reference lets you define a set of common roles across your cluster, then reuse them within multiple namespaces.<br>For instance, even though the following RoleBinding refers to a ClusterRole, "dave" (the subject, case sensitive) will only be able to read Secrets in the "development" namespace, because the RoleBinding's namespace (in its metadata) is "development".<br>apiVersion: rbac.authorization.k8s.io/v1
+# This role binding allows "dave" to read secrets in the "development" namespace.
+# You need to already have a ClusterRole named "secret-reader".
+kind: RoleBinding
+metadata:
+  name: read-secrets
+  #
+  # The namespace of the RoleBinding determines where the permissions are granted.
+  # This only grants permissions within the "development" namespace.
+  namespace: development
+subjects:
+- kind: User
+  name: dave # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+Copy<br><br>To grant permissions across a whole cluster, you can use a ClusterRoleBinding. The following ClusterRoleBinding allows any user in the group "manager" to read secrets in any namespace.<br>apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: Group
+  name: manager # Name is case sensitive
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+Copy<br>Note
+After you create a binding, you cannot change the Role or ClusterRole that it refers to. If you try to change a binding's&nbsp;roleRef, you get a validation error. If you do want to change the&nbsp;roleRef&nbsp;for a binding, you need to remove the binding object and create a replacement.
+<br><br>GET /api/v1/namespaces/{namespace}/pods/{name}/log
+Copy<br>In this case,&nbsp;pods&nbsp;is the namespaced resource for Pod resources, and&nbsp;log&nbsp;is a subresource of&nbsp;pods. To represent this in an RBAC role, use a slash (/) to delimit the resource and subresource. To allow a subject to read&nbsp;pods&nbsp;and also access the&nbsp;log&nbsp;subresource for each of those Pods, you write:<br>apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-and-pod-logs-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list"]
+Copy<br><br>You can&nbsp;aggregate&nbsp;several ClusterRoles into one combined ClusterRole. A controller, running as part of the cluster control plane, watches for ClusterRole objects with an&nbsp;aggregationRule&nbsp;set. The&nbsp;aggregationRule&nbsp;defines a label&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/" target="_blank">selector</a>&nbsp;that the controller uses to match other ClusterRole objects that should be combined into the&nbsp;rules&nbsp;field of this one.<br>apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      rbac.example.com/aggregate-to-monitoring: "true"
+rules: [] # The control plane automatically fills in the rules
+Copy<br>The&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings" target="_blank">default user-facing roles</a>&nbsp;use ClusterRole aggregation. This lets you, as a cluster administrator, include rules for custom resources, such as those served by&nbsp;<a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/" target="_blank">CustomResourceDefinitions</a>&nbsp;or aggregated API servers, to extend the default roles.<br>For example: the following ClusterRoles let the "admin" and "edit" default roles manage the custom resource named CronTab, whereas the "view" role can perform only read actions on CronTab resources. You can assume that CronTab objects are named&nbsp;"crontabs"&nbsp;in URLs as seen by the API server.<br>apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aggregate-cron-tabs-edit
+  labels:
+    # Add these permissions to the "admin" and "edit" default roles.
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aggregate-cron-tabs-view
+  labels:
+    # Add these permissions to the "view" default role.
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: ["stable.example.com"]
+  resources: ["crontabs"]
+  verbs: ["get", "list", "watch"]
+Copy<br><br>A  subject is an entity that can perform actions in the cluster. Subjects can be users, groups, or service accounts.<br>Kubernetes represents usernames as strings. These can be: plain names, such as "alice"; email-style names, like "<a data-tooltip-position="top" aria-label="mailto:bob@example.com" rel="noopener nofollow" class="external-link" href="https://cka.ipcheck.sh/mailto:bob@example.com" target="_blank">bob@example.com</a>"; or numeric user IDs represented as a string.<br>RoleBinding Example:<br>subjects:
+- kind: User
+  name: "alice@example.com"
+  apiGroup: rbac.authorization.k8s.io
+Copy<br>subjects:
+- kind: Group
+  name: "frontend-admins"
+  apiGroup: rbac.authorization.k8s.io
+Copy<br>subjects:
+- kind: Group
+  name: system:authenticated
+  apiGroup: rbac.authorization.k8s.io
+Copy<br><br>API servers create a set of default ClusterRole and ClusterRoleBinding objects. Many of these are&nbsp;system:&nbsp;prefixed, which indicates that the resource is directly managed by the cluster control plane. All of the default ClusterRoles and ClusterRoleBindings are labeled with&nbsp;kubernetes.io/bootstrapping=rbac-defaults.<br><br>When you refer to resources in a Role or ClusterRole, you can use the following shortcuts:<br>
+<br>*&nbsp;indicates all resources.
+<br>*/foo&nbsp;indicates all resources under the&nbsp;foo&nbsp;API group.
+<br>foo/*&nbsp;indicates all resources under the&nbsp;foo&nbsp;resource.
+<br>foo/bar&nbsp;indicates the specific resource&nbsp;bar&nbsp;under the&nbsp;foo&nbsp;resource.
+<br>For example, the following rule allows all actions on all resources in the&nbsp;extensions&nbsp;API group:<br>apiGroups: ["extensions"]
+resources: ["*"]
+verbs: ["*"]
+Copy<br><br><br>Creates a Role object defining permissions within a single namespace.<br># create a Role named "pod-reader" that allows users to perform `get`, `watch` and `list` on pods
+sudo kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
+Copy<br><br>Creates a ClusterRole.<br># create a ClusterRole named "pod-reader" that allows users to perform `get`, `watch`, and `list` on pods
+sudo kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
+Copy<br><br>Grants a Role or ClusterRole within a specific namespace.<br># within the namespace "acme", grant the permissions in the "admin" ClusterRole to a user named "bob"
+sudo kubectl create rolebinding bob-admin-binding --clusterrole=admin --user=bob --namespace=acme
+Copy<br><br>Grants a ClusterRole across the entire cluster (all namespaces).<br># across the entire cluster, grant the permissions in the "cluster-admin" ClusterRole to a user named "root"
+sudo kubectl create clusterrolebinding root-cluster-admin-binding --clusterrole=cluster-admin --user=root
+Copy<br><br>Creates or updates&nbsp;rbac.authorization.k8s.io/v1&nbsp;API objects from a manifest file.<br># test applying a manifest file of RBAC objects, displaying changes that would be made
+sudo kubectl auth reconcile -f my-rbac-rules.yaml --dry-run=client
+Copy<br><br>Service accounts are managed by the Kubernetes API. They are bound to a set of permissions using Role or ClusterRole objects. Service accounts are used to authenticate pods running in the cluster.<br>Grant a role to an application-specific service account (best practice):<br>kubectl create rolebinding my-sa-view \
+  --clusterrole=view \
+  --serviceaccount=my-namespace:my-sa \
+  --namespace=my-namespace
+Copy<br>]]></description><link>https://cka.ipcheck.sh/03-resources/cka/area-01-25-cluster-architecture,-installation,-and-configuration/01-manage-role-based-access-control-(rbac).html</link><guid isPermaLink="false">03 - Resources/CKA/Area 01 - 25% - Cluster Architecture, Installation, and Configuration/01 - Manage role-based Access Control (RBAC).md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sat, 02 Nov 2024 21:43:41 GMT</pubDate></item><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br><br><br>cat &lt;&lt;EOF | sudo tee /etc/modules-load.d/k8s.conf 
+overlay br_netfilter 
+EOF
+
+sudo modprobe overlay 
+sudo modprobe br_netfilter 
+
+# sysctl params required by setup, params persist across reboots 
+cat &lt;&lt;EOF | sudo tee /etc/sysctl.d/k8s.conf 
+net.bridge.bridge-nf-call-iptables = 1 
+net.bridge.bridge-nf-call-ip6tables = 1 
+net.ipv4.ip_forward = 1 
+EOF
+
+# Apply sysctl params without reboot 
+sudo sysctl --system
+Copy<br><br>sudo swapoff -a (crontab -l 2&gt;/dev/null; echo "@reboot /sbin/swapoff -a") | crontab - || true
+Copy<br><br># we use cri-o because it, NOT containerd, is used on the CKA exam
+sudo apt-get update -y 
+
+sudo apt-get install -y software-properties-common gpg curl apt-transport-https ca-certificates 
+
+# pre-requisite for cri-o
+curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /" | tee /etc/apt/sources.list.d/cri-o.list 
+
+# install cri-o
+sudo apt-get update -y 
+sudo apt-get install -y cri-o 
+sudo systemctl daemon-reload 
+sudo systemctl enable crio --now 
+sudo systemctl start crio.service
+
+# install crictl
+VERSION="v1.30.0" 
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz 
+sudo tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/local/bin 
+rm -f crictl-$VERSION-linux-amd64.tar.gz
+Copy<br><br>KUBERNETES_VERSION=1.30 
+
+sudo mkdir -p /etc/apt/keyrings curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBERNETES_VERSION/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt update -y 
+sudo apt-get install -y kubelet=1.30.0-1.1 kubectl=1.30.0-1.1 kubeadm=1.30.0-1.1
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# add node IP to kubelet_extra_args
+sudo apt-get install -y jq
+
+# get our defaut interface
+interface=$(ip route | grep default | awk '{print $5}')
+
+local_ip="$(ip --json addr show $interface | jq -r '.[0].addr_info[] | select(.family == "inet") | .local')"
+
+cat &lt;&lt;EOF | sudo tee /etc/default/kubelet 
+KUBELET_EXTRA_ARGS=--node-ip=$local_ip 
+EOF
+Copy<br><br>IPADDR="10.5.22.102" # replace with IP of master node
+NODENAME=$(hostname -s)
+POD_CIDR="192.168.0.0/16" # verify this doesn't conflict wtih any existing subnets on your home network
+
+# Initialize the cluster
+sudo kubeadm init --apiserver-advertise-address=$IPADDR --apiserver-cert-extra-sans=$IPADDR --pod-network-cidr=$POD_CIDR --node-name $NODENAME --ignore-preflight-errors Swap
+Copy<br><br>mkdir -p $HOME/.kube 
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config 
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+Copy<br><br>k get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   32m   v1.30.6
+
+get po -n kube-system
+
+NAME                                       READY   STATUS    RESTARTS   AGE
+coredns-55cb58b774-4wmkw                   1/1     Running   0          33m
+coredns-55cb58b774-s8k7f                   1/1     Running   0          33m
+etcd-cka1                                  1/1     Running   0          33m
+kube-apiserver-cka1                        1/1     Running   0          33m
+kube-controller-manager-cka1               1/1     Running   0          33m
+kube-proxy-2b2l4                           1/1     Running   0          18m
+kube-proxy-7hm9s                           1/1     Running   0          18m
+kube-proxy-h4hr4                           1/1     Running   0          33m
+kube-scheduler-cka1                        1/1     Running   0          33m
+metrics-server-6455f4d6f7-2vspj            1/1     Running   0          17m
+Copy<br><br>kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+Copy<br><br># get a join token via kubeADM
+kubeadm token create --print-join-command
+
+# run on each node, but not the master
+kubeadm join 10.5.22.102:6443 --token 1bkxvp.4tqsfgex45nmpwv1 --discovery-token-ca-cert-hash sha256:3c2b4c0ca2e1f933418576295f128419daf172ff1c53da0824fdc5b3e3ae1c12
+
+# verify the nodes are joined
+watch -n 1 kubectl get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   36m   v1.30.6
+cka2.secunit.lan   Ready    &lt;none&gt;          21m   v1.30.0
+cka3.secunit.lan   Ready    &lt;none&gt;          21m   v1.30.0
+Copy<br><br>k label node cka2.secunit.lan node-role.kubernetes.io/worker=worker
+k label node cka3.secunit.lan node-role.kubernetes.io/worker=worker
+
+k get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   37m   v1.30.6
+cka2.secunit.lan   Ready    worker          23m   v1.30.0
+cka3.secunit.lan   Ready    worker          22m   v1.30.0
+Copy<br><br>kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
+Copy<br><br>k get pods -n kube-system
+
+NAME                                       READY   STATUS    RESTARTS   AGE
+calico-kube-controllers-5b9b456c66-z2f2m   1/1     Running   0          23m
+calico-node-8lzcg                          1/1     Running   0          23m
+calico-node-tdv7l                          1/1     Running   0          23m
+calico-node-wnmsl                          1/1     Running   0          23m
+coredns-55cb58b774-4wmkw                   1/1     Running   0          38m
+coredns-55cb58b774-s8k7f                   1/1     Running   0          38m
+etcd-cka1                                  1/1     Running   0          38m
+kube-apiserver-cka1                        1/1     Running   0          38m
+kube-controller-manager-cka1               1/1     Running   0          38m
+kube-proxy-2b2l4                           1/1     Running   0          23m
+kube-proxy-7hm9s                           1/1     Running   0          23m
+kube-proxy-h4hr4                           1/1     Running   0          38m
+kube-scheduler-cka1                        1/1     Running   0          38m
+metrics-server-6455f4d6f7-2vspj            1/1     Running   0          22m
+Copy<br><br># metrics are unavailable until the metrics server is installed
+k top nodes
+error: Metrics API not available
+
+# install the metrics server
+k apply -f https://raw.githubusercontent.com/techiescamp/kubeadm-scripts/main/manifests/metrics-server.yaml
+
+# verify the metrics server
+k top nodes
+
+NAME               CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+cka1               55m          2%     1178Mi          63%
+cka2.secunit.lan   21m          1%     870Mi           46%
+cka3.secunit.lan   19m          0%     781Mi           41%
+Copy<br><br>cat &lt;&lt;EOF | kubectl apply -f - 
+apiVersion: apps/v1 
+kind: Deployment 
+metadata:
+  name: nginx-deployment 
+spec: 
+  selector: 
+     matchLabels:
+       app: nginx 
+    replicas: 2 
+    template: 
+      metadata: 
+        labels: 
+          app: nginx 
+      spec: 
+        containers: 
+          - name: nginx 
+            image: nginx:latest
+            ports: 
+              - containerPort: 80
+EOF
+
+# expose a nodeport service
+cat &lt;&lt;EOF | kubectl apply -f - 
+apiVersion: v1 
+kind: Service 
+metadata: 
+  name: nginx-service 
+spec: 
+  selector:
+    app: nginx 
+  type: NodePort 
+  ports: 
+    - port: 80 
+      targetPort: 80
+      nodePort: 32000
+EOF
+
+# check pod status
+k get pods
+
+NAME                               READY   STATUS    RESTARTS   AGE
+nginx-deployment-576c6b7b6-6lnl6   1/1     Running   0          27m
+nginx-deployment-576c6b7b6-wv6kb   1/1     Running   0          27m
+Copy<br><br>curl http://10.5.22.102:32000 | sed 's/&lt;[^&gt;]*&gt;//g'
+
+Welcome to nginx!
+If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.
+
+For online documentation and support please refer to
+nginx.org.
+Commercial support is available at
+nginx.com.
+
+Thank you for using nginx.
+Copy<br><br><br>]]></description><link>https://cka.ipcheck.sh/03-resources/cka/area-01-25-cluster-architecture,-installation,-and-configuration/02-install-k8s-environmemnt.html</link><guid isPermaLink="false">03 - Resources/CKA/Area 01 - 25% - Cluster Architecture, Installation, and Configuration/02 - Install k8s Environmemnt.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sat, 02 Nov 2024 19:34:07 GMT</pubDate></item><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br><br>
+<br>etcd is a distributed key-value store that is used by Kubernetes to store all of its data
+<br>etcd is a critical component of a Kubernetes cluster
+<br>etcd is used to store:
+
+<br>Cluster state
+<br>Configuration
+<br>Secrets
+<br>etc.
+
+
+<br>it uses the <a data-tooltip-position="top" aria-label="https://raft.github.io/" rel="noopener nofollow" class="external-link" href="https://raft.github.io/" target="_blank">raft protocol</a> to ensure data consistency and fault tolerance
+<br><br>Step 1: Log into control plane node<br># log into the control plane node
+ssh control-plane
+
+# install etcd client, if needed
+sudo apt install etcd-client -y
+Copy<br>Step 2: Create a backup directory<br>sudo mkdir -p /opt/backup
+Copy<br>Step 3: Get required information &amp; perform backup<br>sudo kubectl get pods -n kube-system -l component=etcd
+sudo kubectl exec -n kube-system &lt;etcd-pod-name&gt; -- /bin/sh
+sudo etcdctl snapshot save /opt/backup/etcd.db
+
+# copy the backup to your local machine if needed
+kubectl cp kube-system/&lt;etcd-pod-name&gt;:/path/to/backup.db /local/path/to/backup.db
+Copy<br>(optional) One-Liner Backup<br>ETCDCTL_API=3 etcdctl \ --endpoints=https://127.0.0.1:2379 \ --cacert=/etc/kubernetes/pki/etcd/ca.crt \ --cert=/etc/kubernetes/pki/etcd/server.crt \ --key=/etc/kubernetes/pki/etcd/server.key \ snapshot save /opt/backup/etcd.db
+Copy<br>Step 4: Verify the backup<br>ETCDCTL_API=3 etcdctl --write-out=table snapshot status /opt/backup/etcd.db
+Copy<br>Step 5: Restore the backup<br># restore the backup
+ETCDCTL_API=3 etcdctl snapshot restore /opt/backup/etcd.db --data-dir /var/lib/etcd-from-backup
+
+# update the etcd.yaml to reflect the new path if necessary
+sudo nano /etc/kubernetes/manifests/etcd.yaml
+
+volumes: 
+  - hostPath:
+      path: /opt/etcd
+      type: DirectoryOrCreate
+	name: etcd-data
+Copy]]></description><link>https://cka.ipcheck.sh/03-resources/cka/area-01-25-cluster-architecture,-installation,-and-configuration/03-implement-etcd-backup-and-restore.html</link><guid isPermaLink="false">03 - Resources/CKA/Area 01 - 25% - Cluster Architecture, Installation, and Configuration/03 - Implement etcd Backup and Restore.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sat, 02 Nov 2024 21:10:17 GMT</pubDate></item><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br><br>kubeadm version -o json
+{
+  "clientVersion": {
+    "major": "1",
+    "minor": "30",
+    "gitVersion": "v1.30.6",
+    "gitCommit": "00f20d443ba0cbc485d6ce36a7d3f9a9c4e8ed7a",
+    "gitTreeState": "clean",
+    "buildDate": "2024-10-22T20:33:19Z",
+    "goVersion": "go1.22.8",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  }
+}
+Copy<br><br>sudo apt-mark unhold kubeadm kubelet kubectl
+Copy<br><br>sudo apt-cache madison kubeadm | tac
+kubeadm | 1.30.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.1-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.2-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.3-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.4-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.5-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+kubeadm | 1.30.6-1.1 | https://pkgs.k8s.io/core:/stable:/v1.30/deb  Packages
+Copy<br><br>KUBERNETES_VERSION=1.31
+
+sudo mkdir -p /etc/apt/keyrings 
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v$KUBERNETES_VERSION/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v$KUBERNETES_VERSION/deb/ /" | 
+sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt-get update -y
+
+# check available versions
+sudo apt-cache madison kubeadm | tac
+kubeadm | 1.31.0-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+kubeadm | 1.31.1-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+kubeadm | 1.31.2-1.1 | https://pkgs.k8s.io/core:/stable:/v1.31/deb  Packages
+
+sudo apt-get install -y kubeadm=$KUBERNETES_VERSION.2-1.1
+Copy<br><br>sudo apt-mark hold kubeadm
+Copy<br><br>sudo kubeadm upgrade plan
+
+[snip]
+
+You can now apply the upgrade by executing the following command:
+
+        kubeadm upgrade apply v1.31.2
+Copy<br><br>sudo kubeadm upgrade apply v1.31.2
+
+[snip]
+
+[upgrade/successful] SUCCESS! Your cluster was upgraded to "v1.31.2". Enjoy!
+Copy<br><br>sudo kubeadm version -o json
+
+{
+  "clientVersion": {
+    "major": "1",
+    "minor": "31",
+    "gitVersion": "v1.31.2",
+    "gitCommit": "00f20d443ba0cbc485d6ce36a7d3f9a9c4e8ed7a",
+    "gitTreeState": "clean",
+    "buildDate": "2024-10-22T20:33:19Z",
+    "goVersion": "go1.22.8",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  }
+}
+Copy<br><br>k drain cka1 --ignore-daemonsets
+node/cka1 cordoned
+Warning: ignoring DaemonSet-managed Pods: kube-system/calico-node-tdv7l, kube-system/kube-proxy-t8rpf
+evicting pod kube-system/coredns-55cb58b774-4wmkw
+evicting pod kube-system/coredns-55cb58b774-s8k7f
+pod/coredns-55cb58b774-s8k7f evicted
+pod/coredns-55cb58b774-4wmkw evicted
+node/cka1 drained
+Copy<br><br>sudo apt-mark unhold kubelet kubectl &amp;&amp; \
+sudo apt-get install -y kubelet=1.31.2-1.1 kubectl=1.31.2-1.1 &amp;&amp; \
+sudo apt-mark hold kubelet kubectl
+Copy<br><br>sudo systemctl daemon-reload &amp;&amp; \
+sudo systemctl restart kubelet
+Copy<br><br>sudo kubectl uncordon cka1
+
+node/cka1 uncordoned
+Copy<br><br>sudo kubectl get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   76m   v1.31.2
+cka2.secunit.lan   Ready    worker          61m   v1.30.0
+cka3.secunit.lan   Ready    worker          61m   v1.30.0
+Copy<br><br>
+# on master node
+sudo kubectl drain cka2.secunit.lan --ignore-daemonsets
+
+# on cka2 worker node
+sudo apt-mark unhold kubelet kubectl &amp;&amp; \
+sudo apt-get install -y kubelet=1.31.2-1.1 kubectl=1.31.2-1.1 &amp;&amp; \
+sudo apt-mark hold kubelet kubectl &amp;&amp; \
+sudo systemctl daemon-reload &amp;&amp; \
+sudo systemctl restart kubelet
+
+# on master node
+sudo kubectl uncordon cka2.secunit.lan
+
+# verify cka2 version
+sudo kubectl get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   76m   v1.31.2
+cka2.secunit.lan   Ready    worker          61m   v1.31.2
+cka3.secunit.lan   Ready    worker          61m   v1.30.0
+Copy<br>
+note: if you receive an error about deleting Pods with local storage, you can force the drain with the --delete-emptydir-data flag
+e.g. sudo kubectl drain cka2.secunit.lan --ignore-daemonsets --delete-emptydir-data
+<br># on master node
+sudo kubectl drain cka3.secunit.lan --ignore-daemonsets
+
+# on cka3 worker node
+sudo apt-mark unhold kubelet kubectl &amp;&amp; \
+sudo apt-get install -y kubelet=1.31.2-1.1 kubectl=1.31.2-1.1 &amp;&amp; \
+sudo apt-mark hold kubelet kubectl &amp;&amp; \
+sudo systemctl daemon-reload &amp;&amp; \
+sudo systemctl restart kubelet
+
+# on master node
+sudo kubectl uncordon cka3.secunit.lan
+
+# verify cka3 version
+sudo kubectl get nodes
+
+NAME               STATUS   ROLES           AGE   VERSION
+cka1               Ready    control-plane   76m   v1.31.2
+cka2.secunit.lan   Ready    worker          61m   v1.31.2
+cka3.secunit.lan   Ready    worker          61m   v1.31.2
+Copy<br><br>sudo kubectl get --raw='/healthz?verbose'
+[+]ping ok
+[+]log ok
+[+]etcd ok
+[+]poststarthook/start-apiserver-admission-initializer ok
+[+]poststarthook/generic-apiserver-start-informers ok
+[+]poststarthook/priority-and-fairness-config-consumer ok
+[+]poststarthook/priority-and-fairness-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
+[+]poststarthook/start-apiextensions-informers ok
+[+]poststarthook/start-apiextensions-controllers ok
+[+]poststarthook/crd-informer-synced ok
+[+]poststarthook/start-system-namespaces-controller ok
+[+]poststarthook/start-cluster-authentication-info-controller ok
+[+]poststarthook/start-kube-apiserver-identity-lease-controller ok
+[+]poststarthook/start-kube-apiserver-identity-lease-garbage-collector ok
+[+]poststarthook/start-legacy-token-tracking-controller ok
+[+]poststarthook/start-service-ip-repair-controllers ok
+[+]poststarthook/rbac/bootstrap-roles ok
+[+]poststarthook/scheduling/bootstrap-system-priority-classes ok
+[+]poststarthook/priority-and-fairness-config-producer ok
+[+]poststarthook/bootstrap-controller ok
+[+]poststarthook/aggregator-reload-proxy-client-cert ok
+[+]poststarthook/start-kube-aggregator-informers ok
+[+]poststarthook/apiservice-status-local-available-controller ok
+[+]poststarthook/apiservice-status-remote-available-controller ok
+[+]poststarthook/apiservice-registration-controller ok
+[+]poststarthook/apiservice-discovery-controller ok
+[+]poststarthook/kube-apiserver-autoregistration ok
+[+]autoregister-completion ok
+[+]poststarthook/apiservice-openapi-controller ok
+[+]poststarthook/apiservice-openapiv3-controller ok
+healthz check passed
+
+# are all kube-system pods running?
+sudo kubectl get po -n kube-system -o custom-columns="NAME:.metadata.name,READY:.status.containerStatuses[*].ready,STATUS:.status.phase"
+
+NAME                                       READY   STATUS
+calico-kube-controllers-5b9b456c66-vwk4w   true    Running
+calico-node-8lzcg                          true    Running
+calico-node-tdv7l                          true    Running
+calico-node-wnmsl                          true    Running
+coredns-55cb58b774-9ddnt                   true    Running
+coredns-55cb58b774-bmccx                   true    Running
+etcd-cka1                                  true    Running
+kube-apiserver-cka1                        true    Running
+kube-controller-manager-cka1               true    Running
+kube-proxy-hrpl7                           true    Running
+kube-proxy-t8rpf                           true    Running
+kube-proxy-wlcd6                           true    Running
+kube-scheduler-cka1                        true    Running
+metrics-server-6455f4d6f7-j9vwp            true    Running
+Copy<br>]]></description><link>https://cka.ipcheck.sh/03-resources/cka/area-01-25-cluster-architecture,-installation,-and-configuration/04-upgrade-a-k8s-cluster.html</link><guid isPermaLink="false">03 - Resources/CKA/Area 01 - 25% - Cluster Architecture, Installation, and Configuration/04 - Upgrade a k8s Cluster.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sat, 02 Nov 2024 19:23:16 GMT</pubDate></item><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br><br>Static Pods are pods whose configuration is managed directly by the kubelet on a node<br><br>
+<br>Static Pods are always bound to one kubelet on a node
+<br>Static Pods are not managed by the control plane
+<br>Static Pods are managed directly by the kubelet
+<br>Primarily used for cluster bootstrapping purposes.
+<br><br><br>ps -aux | grep kubelet | grep config.yaml
+
+cat /var/lib/kubelet/config.yaml | grep static
+ staticPodPath: /etc/kubernetes/manifests
+Copy<br>create static pod configuration file<br>cat &lt;&lt;EOF | sudo tee /etc/kubernetes/manifests/nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: webserver
+spec:
+  containers:
+  - image: nginx
+    name: webserver-container
+EOF
+Copy<br>list static pods<br>sudo crictl pods # from worker node
+sudo kubectl get pods -o custom- # from control plane node
+Copy]]></description><link>https://cka.ipcheck.sh/03-resources/cka/area-02-15-workloads-&amp;-scheduling/01-static-pods.html</link><guid isPermaLink="false">03 - Resources/CKA/Area 02 - 15% - Workloads &amp; Scheduling/01 - Static Pods.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sat, 02 Nov 2024 21:50:00 GMT</pubDate></item><item><title><![CDATA[98 - Exam Sim Results & Tips]]></title><description><![CDATA[ 
+ <br>Attention
+Use kubectl where possible, not YAML files!
+<br>For running pods:<br>k run manual-schedule2 --image=httpd:2.4-alpine]]></description><link>https://cka.ipcheck.sh/03-resources/cka/98-exam-sim-results-&amp;-tips.html</link><guid isPermaLink="false">03 - Resources/CKA/98 - Exam Sim Results &amp; Tips.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sun, 03 Nov 2024 15:31:16 GMT</pubDate></item><item><title><![CDATA[CKA Training Notes]]></title><description><![CDATA[ 
+ <br><br><br>Exam Tip, Allowed Websites:<br>
+<br><a data-tooltip-position="top" aria-label="https://kubernetes.io/docs/home/" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/docs/home/" target="_blank">Kubernetes.io</a> (official documentation, however, they _may only open search results that have a domain matching the sites listed above)
+<br><a data-tooltip-position="top" aria-label="https://kubernetes.io/blog/" rel="noopener nofollow" class="external-link" href="https://kubernetes.io/blog/" target="_blank">Kubernetes.io Blog</a> (official blog)
+<br><br>Kubernetes is a container orchestration platform that automates the deployment, scaling, and management of containerized applications. It is designed to run on a cluster of machines, and it abstracts the underlying infrastructure from the applications running on it.<br><img alt="02-k8s-architecture.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture.gif"><br><br><br>The&nbsp;kube-api server&nbsp;is the central hub of the Kubernetes cluster that exposes the Kubernetes API. It is highly scalable and can handle large number of concurrent requests.<br>So when you use kubectl to manage the cluster, at the backend you are actually communicating with the API server through&nbsp;HTTP REST APIs. However, the internal cluster components like the scheduler, controller, etc talk to the API server using&nbsp;<a data-tooltip-position="top" aria-label="https://grpc.io/docs/what-is-grpc/introduction/" rel="noopener nofollow" class="external-link" href="https://grpc.io/docs/what-is-grpc/introduction/" target="_blank">gRPC</a>.<br>All communication happens over TLS to prevent unauthorized access.<br><br>
+<br>Serving the Kubernetes API
+<br>Validating and configuring data for the API objects
+<br>Serving the UI and CLI
+<br>Handling authentication and authorization
+<br>Storing the API objects in etcd
+<br>Scaling the control plane &amp; worker components
+<br>The API Server has a built-in proxy that is primarily used to enable access to the API server from outside the cluster. The API server is also responsible for validating and configuring data for the API objects.<br>Common commands:<br># start the apiserver proxy
+sudo kubectl proxy --port=8080
+
+# port-forward to a pod
+sudo kubectl port-forward pod-name 8080:80
+
+# execute a command in a pod, like a shell
+sudo kubectl exec -it pod-name -- /bin/bash
+Copy<br><img alt="02-k8s-architecture-api.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-api.gif"><br><br>etcd is a distributed key-value store that is used by Kubernetes to store all of its data. <br>It is a critical component of a Kubernetes cluster, and it is used to store all configuration data, secrets, and the state of the cluster. <br>It exposes the key-value store via a <a data-tooltip-position="top" aria-label="https://etcd.io/docs/v3.5/learning/api/" rel="noopener nofollow" class="external-link" href="https://etcd.io/docs/v3.5/learning/api/" target="_blank">gRPC</a> API. It uses a <a data-tooltip-position="top" aria-label="https://etcd.io/docs/v3.3/dev-guide/api_grpc_gateway/" rel="noopener nofollow" class="external-link" href="https://etcd.io/docs/v3.3/dev-guide/api_grpc_gateway/" target="_blank">gRPC gateway</a> to expose the key-value store via an HTTP API.<br>All objects are stored under the /registry directory key in key value format, for example: /registry/pods/default/nginx<br><img alt="02-k8s-architecture-etcd.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-etcd.gif"><br>etcd fault tolerance
+The number of nodes in an etcd cluster directly affects its fault tolerance capabilities, aka quorum. You ALWAYS want an odd number of nodes so there isn't a possibility of quorum votes tying.
+
+<br>3 nodes = 1 node can fail
+<br>5 nodes = 2 nodes can fail
+<br>7 nodes = 3 nodes can fail
+
+To calculate number of nodes that can fail where ft = fault tolerance and n equals the total number of nodes:
+
+<br><br>The kube-scheduler is a control plane component that watches for newly created Pods with no assigned node, and selects a worker node for them to run on. <br>When you deploy a pod, you specify the pod requirements such as CPU, memory, affinity, taints or tolerations, priority, persistent volumes (PV),&nbsp; etc. The scheduler’s primary task is to identify the create request and choose the best node for a pod that satisfies the requirements.<br><img alt="02-k8s-architecture-sc.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-sc.gif"><br><img alt="02-k8s-architecture-sc-logic.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-sc-logic.gif"><br><br>The kube-controller-manager is a control plane component that runs controller processes in an infinite loop to regulate the state of the cluster.<br>It manages all the controllers that regulate the state of the cluster, such as the replication controller, endpoints controller, namespace controller, and service accounts controller.<br>What to know about the kube-controller-manager:
+
+<br>It manages all the controllers and the controllers try to keep the cluster in the desired state.
+<br>You can extend kubernetes with&nbsp;custom controllers&nbsp;associated with a custom resource definition.
+
+<br><img alt="02-k8s-architecture-cm.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-cm.gif"><br>Info
+
+<br>Deployment Controller
+<br>ReplicaSet Controller
+<br>DaemonSet Controller
+<br>Job Controller
+<br>CronJob Controller
+<br>Endpoints Controller
+<br>Namespace Controller
+<br>Service Account Controller
+<br>Node Controller
+
+<br><br>When deployed into a cloud environment (AWS, Azure, GCP) the cloud-controller-manager runs controllers that interact with the underlying cloud provider. <br>The cloud-controller-manager allows cloud vendors to abstract their cloud-specific code from the core Kubernetes codebase.<br><a data-tooltip-position="top" aria-label="https://devopscube.com/aws-cloud-controller-manager/" rel="noopener nofollow" class="external-link" href="https://devopscube.com/aws-cloud-controller-manager/" target="_blank">Cloud controller integration</a>&nbsp;allows Kubernetes cluster to provision cloud resources like instances (for nodes), Load Balancers (for services), and Storage Volumes (for persistent volumes).<br><img alt="02-k8s-architecture-ccm-1.gif" src="https://cka.ipcheck.sh/lib/media/02-k8s-architecture-ccm-1.gif"><br>Platform specific controllers:
+
+<br>Node Controller
+
+<br>This controller updates node-related information by talking to the cloud provider API. For example, node labeling &amp; annotation, getting hostname, CPU &amp; memory availability, nodes health, etc.
+
+
+<br>Route Controller
+
+<br>It is responsible for configuring networking routes on a cloud platform. So that pods in different nodes can talk to each other.
+
+
+<br>Service Controller
+
+<br>It takes care of deploying load balancers for Kubernetes services, assigning IP addresses, etc.
+
+
+
+<br><br><br>Kubelet is an agent component that runs on every node in the cluster. It does not run as a container instead runs as a daemon, managed by systemd.<br>It is responsible for registering worker nodes with the API server and working with the podSpec (Pod specification – YAML or JSON) primarily from the API server. podSpec defines the containers that should run inside the pod, their resources (e.g. CPU and memory limits), and other settings such as environment variables, volumes, and labels.<br>It then brings the podSpec to the desired state by creating containers. It also reports the status of the pod back to the API server.<br>Responsibilities of kubelet:
+
+<br>Creating, modifying, and deleting containers for the pod.
+<br>Responsible for handling liveliness, readiness, and startup probes.
+<br>Responsible for Mounting volumes by reading pod configuration and creating respective directories on the host for the volume mount.
+<br>Collecting and reporting Node and pod status via calls to the API server with implementations like&nbsp;cAdvisor&nbsp;and&nbsp;CRI.
+<br>Garbage collection of pods and containers.
+
+<br><br>The kube-proxy is a network proxy that runs on each node in your cluster, implementing part of the Kubernetes Service concept.<br>Services in Kubernetes
+Service in Kubernetes is a way to expose a set of pods internally or to external traffic. When you create the service object, it gets a virtual IP assigned to it. It is called clusterIP. It is only accessible within the Kubernetes cluster.
+<br>Endpoint Objects
+The Endpoint object contains all the IP addresses and ports of pod groups under a Service object. The endpoints controller is responsible for maintaining a list of pod IP addresses (endpoints). The service controller is responsible for configuring endpoints to a service.
+<br>Note
+You cannot ping the ClusterIP because it is only used for service discovery, unlike pod IPs which are pingable.
+<br>Kube-proxy is a daemon that runs on every node as a&nbsp;<a data-tooltip-position="top" aria-label="https://devopscube.com/kubernetes-daemonset/" rel="noopener nofollow" class="external-link" href="https://devopscube.com/kubernetes-daemonset/" target="_blank">daemonset</a>. It is a proxy component that implements the Kubernetes Services concept for pods. (single DNS for a set of pods with load balancing). It primarily proxies UDP, TCP, and SCTP and does not understand HTTP.<br>When you expose pods using a Service (ClusterIP), Kube-proxy creates network rules to send traffic to the backend pods (endpoints) grouped under the Service object. Meaning, all the load balancing, and service discovery are handled by the Kube proxy.<br>Kube-proxy modes:<br>
+<br>IPTables mode (default)
+
+<br>It uses the iptables rules to forward traffic to the backend pods.
+
+
+<br>IPVS mode
+<br>
+<br>It uses the IPVS (IP Virtual Server) kernel module to forward traffic to the backend pods.
+<br>It is more efficient than iptables mode and is recommended for large scale clusters.
+<br>
+<br>Userspace mode
+<br>
+<br>It is the legacy mode and is not recommended for production use.
+<br>It uses a userspace proxy to forward traffic to the backend pods.
+<br>
+<br>Kernelspace mode (Windows)
+<br>
+<br>It is the legacy mode and is not recommended for production use.
+<br>It uses a kernel proxy to forward traffic to the backend pods.
+<br>1.29+
+There is a new nftables based backend for kube-proxy. It is in alpha state and is not recommended for production use.
+<br><br>You probably know about&nbsp;<a data-tooltip-position="top" aria-label="https://aws.amazon.com/what-is/java-runtime-environment/" rel="noopener nofollow" class="external-link" href="https://aws.amazon.com/what-is/java-runtime-environment/" target="_blank">Java Runtime (JRE)</a>. It is the software required to run Java programs on a host. In the same way, container runtime is a software component that is required to run containers on a host.<br>The container runtime is responsible for running containers, managing container images, and handling container networking.<br>Kubernetes supports multiple container runtimes like Docker, containerd, CRI-O, and others. The container runtime is specified in the kubelet configuration file.<br>Key Concepts:<br>
+<br>Container Runtime Interface (CRI)
+<br>
+<br>The CRI is an API that enables kubelet to use any container runtime that implements the CRI.
+<br>
+<br>Container Runtime
+<br>
+<br>The container runtime is the software that is responsible for running containers.
+<br>
+<br>Open Container Initiative (OCI)
+<br>
+<br>The OCI is a standard for container runtimes and image formats. It is maintained by the Linux Foundation.
+<br><br>
+<br>CNI Plugin (Container Network Interface)
+
+<br>Flannel, Calico, Weave Net, Amazon VPC CNI, etc.
+
+
+<br>CoreDNS
+
+<br>DNS Service for internal Kubernetes services.
+<br>service-name.namespace.svc.cluster.local
+<br>pod-name.namespace.pod.cluster.local
+
+
+<br>Metrics Server
+
+<br>Provides resource usage metrics for pods and nodes.
+
+
+<br>WebUI (Kubernetes Dashboard)
+
+<br>Web-based UI for managing Kubernetes resources.
+
+
+<br>Native Objects in Kubernetes:
+DaemonSet: Ensures that all nodes run a copy of a pod.<br>
+Deployment: A way to manage the lifecycle of pods.<br>
+Job: Runs a pod to completion.<br>
+Namespace: A way to divide cluster resources between multiple users.<br>
+Pods: The smallest unit in Kubernetes. A pod can have one or more containers.<br>
+ReplicaSet: Ensures that a specified number of pod replicas are running at any given time.<br>
+Secret: A way to inject sensitive data into pods.<br>
+Service: Exposes a set of pods as a network service.<br>
+ServiceAccount: Provides an identity for processes that run in a pod.<br>
+StatefulSet: A way to manage the deployment of stateful applications.<br>
+Volume: A directory that is accessible to all containers in a pod.
+]]></description><link>https://cka.ipcheck.sh/03-resources/cka/99-kubernetes-reference-and-diagrams.html</link><guid isPermaLink="false">03 - Resources/CKA/99 - Kubernetes Reference and Diagrams.md</guid><dc:creator><![CDATA[Matthew Evans]]></dc:creator><pubDate>Sun, 03 Nov 2024 13:42:17 GMT</pubDate><enclosure url="https://cka.ipcheck.sh/lib/media/02-k8s-architecture.gif" length="0" type="image/gif"/><content:encoded>&lt;figure&gt;&lt;img src=&quot;https://cka.ipcheck.sh/lib/media/02-k8s-architecture.gif&quot;&gt;&lt;/figure&gt;</content:encoded></item></channel></rss>
